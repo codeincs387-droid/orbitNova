@@ -1,0 +1,31 @@
+# Pixi environment
+.pixi/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Secrets
+.env
+.netrc
+
+# Original NASA downloads
+data/raw/
+
+# Large processed datasets
+data/processed/monthly_grid/
+
+# NetCDF and scientific binary files
+*.nc
+*.nc4
+*.h5
+*.hdf
+
+# Temporary files
+*.log
+.DS_Store
+
+# Temporary T2M transfer
+_t2m_transfer/
+T2M_Member2_Complete.zip
+test1/
