@@ -1,658 +1,373 @@
-# orbitNova
+# Earth Trend Detective
 
-**India Climate Data Processing and Visualization**
+### Discovering Regional Climate Patterns Across India
 
-orbitNova is a Python-based project for processing NASA MERRA-2 climate datasets, extracting India-specific gridded data, generating monthly regional statistics for Indian states and union territories (UTs), and visualizing the results through an interactive web dashboard.
+**Earth Trend Detective** is a climate data analysis and visualization project designed to identify, analyze and understand long-term environmental trends across India.
 
-The project currently supports two climate variables:
+National climate averages often hide significant regional variations. While temperature, precipitation and dry-day conditions may increase in one region and decrease in another, a single national average cannot adequately represent these differences.
 
-- **CDD (Cooling Degree Days):** Used to analyze cooling demand and temperature-related climate patterns.
-- **T2M (2-Metre Air Temperature):** Monthly average near-surface air temperature from NASA MERRA-2.
-
-The processed datasets are extracted for India and used to generate monthly statistics at both state/UT and national levels.
+Earth Trend Detective addresses this challenge by transforming large-scale satellite-derived climate datasets into meaningful regional insights through geospatial analysis, statistical trend detection, interactive visualization and predictive modelling.
 
 ---
 
-## Table of Contents
+## The Problem We Address
 
-1. [Project Structure](#1-project-structure)
-2. [Requirements and Environment Setup](#2-requirements-and-environment-setup)
-3. [CDD Data Processing Workflow](#3-cdd-data-processing-workflow)
-4. [T2M Data Processing Workflow](#4-t2m-data-processing-workflow)
-5. [Regional Output Files](#5-regional-output-files)
-6. [India State and UT Boundary Data](#6-india-state-and-ut-boundary-data)
-7. [Running the Dashboard Locally](#7-running-the-dashboard-locally)
-8. [Important Notes and Recommendations](#8-important-notes-and-recommendations)
-9. [Recommended Execution Sequence](#9-recommended-execution-sequence)
-10. [Project Documentation](#10-project-documentation)
+Climate change does not affect every geographical region equally.
+
+- **Regional variations:** Climate indicators can behave differently across states and geographical regions.
+- **Hidden climate patterns:** National averages can conceal important local and regional changes.
+- **Difficult data interpretation:** Large scientific datasets, particularly NetCDF files, are difficult to interpret without specialized tools.
+- **Limited accessibility:** Raw climate datasets do not directly communicate trends in a way that is easy for researchers and decision-makers to understand.
+- **Understanding future conditions:** Historical patterns can help identify potential future climate risks, but require careful statistical analysis and predictive modelling.
+
+**Our objective:** Make climate trends easier to discover, understand and interpret at both national and state/UT levels.
 
 ---
 
-## 1. Project Structure
+## Our Solution
 
-The project follows this directory structure:
+We are developing an integrated climate trend detection platform that processes historical climate data, identifies regional patterns and presents the findings through an interactive dashboard.
+
+The platform focuses on three important climate indicators:
+
+| Climate variable | Description             | Unit |
+| ---------------- | ----------------------- | ---- |
+| T2M              | 2-metre air temperature | °C   |
+| PRECTOT          | Total precipitation     | mm   |
+| CDD              | Consecutive dry days    | Days |
+
+Using historical climate observations, the system enables users to explore how these indicators change over time and how their trends differ across Indian states and union territories.
+
+---
+
+## Key Features
+
+### 1. Climate Data Processing
+
+- Integration with NASA MERRA-2 climate datasets.
+- Downloading and processing scientific NetCDF/NC4 files.
+- Extraction of India-specific geographical regions.
+- Processing monthly climate observations.
+- Conversion and preparation of climate variables for regional analysis.
+
+### 2. Geospatial Analysis
+
+- State-wise and Union Territory-wise climate analysis.
+- Integration of Indian geographical boundaries using GeoJSON.
+- Regional climate statistics and comparisons.
+- Identification of differences between national and regional trends.
+
+### 3. Statistical Trend Detection
+
+The dashboard calculates and displays:
+
+- Long-term climate change.
+- Trend slope and rate of change.
+- Statistical significance (p-value).
+- Coefficient of determination (R²).
+- Slope standard error.
+- 95% confidence interval.
+- Mean, maximum, minimum and standard deviation.
+
+These statistics help distinguish observed trends from ordinary climate variability.
+
+### 4. Interactive Climate Dashboard
+
+Users can:
+
+- Explore climate patterns through an interactive map of India.
+- Select temperature, precipitation or dry-day indicators.
+- Select different time periods.
+- Explore individual states and union territories.
+- Visualize historical climate trends through graphs.
+- Examine statistical summaries and trend interpretations.
+
+### 5. Predictive Modelling
+
+The project also includes a CDD model-results section.
+
+It provides:
+
+- Actual versus predicted CDD values.
+- Model performance evaluation.
+- Mean Absolute Error (MAE).
+- Root Mean Squared Error (RMSE).
+- R² score.
+- State-wise model performance.
+- Feature importance.
+- Actual, predicted and error maps.
+
+The interpretation of the model output depends on its configured prediction lead time.
+
+## &#x20;Data Sources
+
+The project uses NASA's Modern-Era Retrospective Analysis for Research and Applications, Version 2 (MERRA-2).
+
+**Primary data source:**
+
+- NASA GES DISC: [https://disc.gsfc.nasa.gov/](https://disc.gsfc.nasa.gov/)
+- NASA Earthdata: [https://www.earthdata.nasa.gov/](https://www.earthdata.nasa.gov/)
+
+MERRA-2 provides historical atmospheric and climate-related observations that can be used to investigate changes over time.
+
+**Data format:** NetCDF / NC4
+
+**Geographical focus:** India, including individual states and union territories.
+
+**Temporal resolution:** Monthly climate data.
+
+## &#x20;Technology Stack
+
+| Component              | Technologies                    |
+| ---------------------- | ------------------------------- |
+| Programming language   | Python 3.12                     |
+| Data processing        | NumPy, Pandas, SciPy            |
+| Climate data handling  | Xarray, NetCDF4, h5netcdf       |
+| Geospatial processing  | GeoPandas, GDAL, Rasterio, PROJ |
+| Statistical analysis   | SciPy, PyMannKendall            |
+| Backend environment    | FastAPI, Uvicorn                |
+| Frontend               | HTML, CSS, JavaScript           |
+| Interactive maps       | Leaflet.js                      |
+| Data visualization     | JavaScript, SVG, HTML Canvas    |
+| Environment management | Pixi                            |
+
+## &#x20;Project Architecture
+
+The project follows a data-processing and visualization workflow.
+
+```text
+        NASA MERRA-2 DATA
+                |
+                v
+       NetCDF / NC4 FILES
+                |
+                v
+       DATA EXTRACTION
+        (India Region)
+                |
+                v
+      CLIMATE DATA PROCESSING
+       /        |         \
+      /         |          \
+ Temperature Precipitation  CDD
+      \         |          /
+       \        |         /
+                v
+       GEOSPATIAL ANALYSIS
+      (States & Union Territories)
+                |
+                v
+        STATISTICAL ANALYSIS
+                |
+          +-----+------+
+          |            |
+          v            v
+     TREND ANALYSIS  PREDICTIVE
+                     MODELLING
+          |            |
+          +-----+------+
+                |
+                v
+       INTERACTIVE DASHBOARD
+                |
+                v
+       REGIONAL CLIMATE INSIGHTS
+```
+
+## &#x20;Repository Structure
 
 ```text
 orbitNova/
+│
+├── UI/
+│   ├── dashboard.js
+│   ├── map.js
+│   ├── leaflet.js
+│   └── leaflet.css
+│
 ├── data/
+│   ├── raw/
 │   ├── processed/
+│   │   ├── monthly_grid/
 │   │   └── regional_timeseries/
-│   │       ├── cdd_india_monthly.csv
-│   │       ├── cdd_state_monthly.csv
-│   │       ├── cdd_validation_report.csv
-│   │       ├── t2m_india_monthly.csv
-│   │       ├── t2m_missing_months.txt
-│   │       ├── t2m_state_monthly.csv
-│   │       └── t2m_validation_report.csv
+│   ├── predictions_cdd/
 │   └── reference/
 │       └── india_states_ut.geojson
+│
 ├── docs/
 │   └── PHASE_3_CDD_REPORT.md
-├── pixi.lock
-├── pixi.toml
-├── README.md
+│
 ├── scripts/
 │   ├── CDD/
-│   │   ├── analyze_cdd_by_state.py
-│   │   ├── check_cdd_regional_output.py
-│   │   ├── check_cdd_versions.py
-│   │   ├── download_all_cdd.py
-│   │   ├── download_cdd_test.py
-│   │   ├── extract_india_cdd.py
-│   │   ├── extract_india_cdd_v2.py
-│   │   ├── inspect_cdd.py
-│   │   ├── inspect_india_boundaries.py
-│   │   └── validate_cdd_dataset.py
 │   └── T2M/
-│       ├── 01_check_collection.py
-│       ├── 02_download_test.py
-│       ├── 03_inspect_test.py
-│       ├── 04_extract_test.py
-│       ├── 05_download_all.py
-│       ├── 06_validate_output.py
-│       ├── process_t2m_india.py
-│       └── process_t2m_regions.py
-└── UI/
-    ├── dashboard.js
-    ├── index.html
-    ├── leaflet.css
-    ├── leaflet.js
-    └── map.js
+│
+├── index.html
+├── pixi.toml
+├── pixi.lock
+├── LICENSE
+└── README.md
 ```
 
----
+*Note: Some generated data directories and files are created during processing and may not be present in a fresh clone.*
 
-## 2. Requirements and Environment Setup
+## &#x20;Installation and Setup
 
 ### Prerequisites
 
-- Python 3
-- [Pixi](https://pixi.sh) for Python environment and dependency management
+Before running the project, install:
+
+- Python 3.12
+- Pixi package manager
+- Git
 - NASA Earthdata account
-- Internet connection for downloading NASA datasets and loading online map tiles
+- A modern web browser
 
-### Open the project
+### 1. Clone the repository
 
-Open the project directory in your terminal:
+```bash
+git clone https://github.com/codeincs387-droid/orbitNova.git
+```
+
+Navigate into the project:
 
 ```bash
 cd orbitNova
 ```
 
-Install the project environment and dependencies:
+### 2. Install dependencies
 
 ```bash
 pixi install
 ```
 
-All Python scripts should be executed from the project root directory using `pixi run`.
+Pixi automatically creates the project environment using the dependencies specified in `pixi.toml`.
 
-### NASA Earthdata Authentication
+### 3. NASA Earthdata authentication
 
-The CDD and T2M download scripts retrieve data from NASA Earthdata.
+A valid NASA Earthdata account is required for downloading protected climate datasets.
 
-You must have a valid NASA Earthdata account and complete authentication when prompted by the download scripts.
+Visit:
 
----
+[https://urs.earthdata.nasa.gov/](https://urs.earthdata.nasa.gov/)
 
-## 3. CDD Data Processing Workflow
+Configure your authentication as required by the download scripts.
 
-The CDD workflow downloads NASA MERRA-2 Cooling Degree Days datasets, extracts the India geographical region, validates the processed data, and generates monthly statistics for India and individual states/UTs.
+### 4. Process climate datasets
 
-### Execution Order
+Execute the relevant processing scripts from the project root.
 
-All scripts in this workflow are located inside `scripts/CDD/`.
-
-### Step 1. Check NASA dataset version
+For example, the CDD workflow:
 
 ```bash
 pixi run python scripts/CDD/check_cdd_versions.py
-```
 
-Checks the available MERRA-2 CDD collection and its version.
-
-### Step 2. Download a sample CDD file
-
-```bash
 pixi run python scripts/CDD/download_cdd_test.py
-```
 
-Downloads a sample CDD dataset from NASA Earthdata.
-
-Log in using your NASA Earthdata account when prompted.
-
-### Step 3. Inspect the sample dataset
-
-```bash
 pixi run python scripts/CDD/inspect_cdd.py
-```
 
-Inspects the downloaded NetCDF file, including:
-
-- Collection information
-- Dataset date
-- CDD variable
-- Variable dimensions
-- Units and metadata
-
-Run Step 2 before this step.
-
-### Step 4. Test India-region extraction
-
-```bash
-pixi run python scripts/CDD/extract_india_cdd_v2.py
-```
-
-Extracts the India geographical region from the sample NetCDF file and saves the extracted result.
-
-### Step 5. Download and extract all CDD datasets
-
-```bash
 pixi run python scripts/CDD/download_all_cdd.py
-```
 
-Downloads the available historical monthly CDD datasets from NASA Earthdata and extracts the India region into individual NetCDF files.
-
-### Step 6. Validate the extracted datasets
-
-```bash
 pixi run python scripts/CDD/validate_cdd_dataset.py
-```
 
-Checks the downloaded and extracted files for:
-
-- Missing data
-- Invalid values
-- Coordinate consistency
-- Monthly data coverage
-
-Complete validation before proceeding with regional analysis.
-
-### Step 7. Inspect India state and UT boundaries
-
-```bash
-pixi run python scripts/CDD/inspect_india_boundaries.py
-```
-
-Inspects the India state/UT GeoJSON boundary file, including:
-
-- Feature count
-- Coordinate reference system
-- Geometry validity
-- Boundary information
-
-The boundary file is:
-
-```text
-data/reference/india_states_ut.geojson
-```
-
-### Step 8. Generate state/UT and India-level statistics
-
-```bash
 pixi run python scripts/CDD/analyze_cdd_by_state.py
 ```
 
-Processes the monthly CDD grids and generates regional statistics for:
-
-- Individual Indian states
-- Union territories
-- India as a whole
-
-The results are saved in:
-
-```text
-data/processed/regional_timeseries/
-```
-
-### Step 9. Check the final regional outputs
-
-```bash
-pixi run python scripts/CDD/check_cdd_regional_output.py
-```
-
-Checks the generated regional CSV files for:
-
-- Regional coverage
-- Duplicate records
-- Missing values
-- Valid grid-cell counts
-
----
-
-## 4. T2M Data Processing Workflow
-
-The T2M workflow processes NASA MERRA-2 2-metre air temperature data from the `M2TMNXSLV` collection, version `5.12.4`.
-
-The workflow downloads monthly temperature datasets, extracts the India region, converts temperature from Kelvin to Celsius, and calculates area-weighted temperature statistics for India and its states/UTs.
-
-All scripts in this workflow are located inside `scripts/T2M/`.
-
-### Execution Order
-
-### Step 1. Check NASA dataset collection
+For temperature processing:
 
 ```bash
 pixi run python scripts/T2M/01_check_collection.py
-```
 
-Searches NASA Earthdata for the MERRA-2 temperature collection (`M2TMNXSLV`).
-
-Prints the matching collection's:
-
-- Short name
-- Version
-- Concept ID
-- Title
-- Abstract
-- Summary
-
-Stops with an error if the collection is not found.
-
-### Step 2. Download a sample T2M file
-
-```bash
 pixi run python scripts/T2M/02_download_test.py
-```
 
-Logs in to NASA Earthdata and downloads up to 10 monthly granules for January 2020.
-
-The downloaded files are saved in:
-
-```text
-data/raw/merra2/temperature/
-```
-
-Enter your NASA Earthdata account details when prompted.
-
-### Step 3. Inspect the sample dataset
-
-```bash
 pixi run python scripts/T2M/03_inspect_test.py
-```
 
-Opens the first `.nc4` file in the raw data folder and prints:
-
-- Dataset structure
-- Available variables
-- `T2M` dimensions and shape
-- Units
-- Latitude and longitude ranges
-- Time information
-
-Run Step 2 before this step.
-
-### Step 4. Test India-region extraction
-
-```bash
-pixi run python scripts/T2M/04_extract_test.py
-```
-
-Extracts the India geographical bounding box:
-
-| Parameter | Range |
-|-----------|-------|
-| Latitude | 5°–38° N |
-| Longitude | 67°–99° E |
-
-Handles both ascending and descending latitude coordinates.
-
-Saves the extracted compressed NetCDF file in:
-
-```text
-data/processed/monthly_grid/temperature/
-```
-
-The output filename follows this format:
-
-```text
-T2M_India_YYYYMM.nc
-```
-
-### Step 5. Download and extract all T2M datasets
-
-```bash
 pixi run python scripts/T2M/05_download_all.py
-```
 
-Downloads monthly T2M granules from 2000-01-01 up to the current date.
-
-The script:
-
-1. Downloads one monthly granule at a time.
-2. Retries failed downloads up to three times.
-3. Extracts the India geographical region.
-4. Validates the extracted output.
-5. Deletes the large raw file after successful extraction.
-6. Retains raw files if extraction fails.
-
-Download activity is logged in:
-
-```text
-reports/download_log.csv
-```
-
-Processed monthly NetCDF files are saved in:
-
-```text
-data/processed/monthly_grid/temperature/
-```
-
-### Step 6. Validate the extracted datasets
-
-```bash
-pixi run python scripts/T2M/06_validate_output.py
-```
-
-This script is intended to validate all processed monthly files for:
-
-- Missing months
-- Invalid values
-- Coordinate consistency
-- Monthly coverage
-
-> **Note:** The validation script is currently empty. Validation will not be performed until its logic is implemented.
-
-### Step 7. Convert to Celsius and generate state/UT and India-level statistics
-
-```bash
 pixi run python scripts/T2M/process_t2m_india.py
 ```
 
-Reads the monthly NetCDF files generated in Step 5.
+Run the sample extraction and inspection steps as appropriate before processing the complete datasets.
 
-The script:
+## &#x20;Running the Dashboard
 
-1. Converts temperature from Kelvin to Celsius.
-2. Saves India-only monthly NetCDF files using the variable `T2M_C`.
-3. Builds state/UT geographical masks using the GeoJSON boundary file.
-4. Calculates area-weighted mean, median, minimum, and maximum temperatures.
-5. Generates monthly statistics for India and every state/UT.
-
-The India-only Celsius NetCDF files are saved in:
-
-```text
-data/processed/monthly_grid/temperature_india/
-```
-
-The expected processing period is:
-
-```text
-2000-01 to 2026-09
-```
-
-Months outside this period are skipped.
-
-Months with duplicate records or implausible temperatures (below -100 °C or above 70 °C) are reported as errors.
-
-The regional CSV and validation outputs are saved in:
-
-```text
-data/processed/regional_timeseries/
-```
-
-### Step 8. Re-generate regional statistics from the Celsius grids (optional)
+Once the required processed data files are available, run the application from the project root.
 
 ```bash
-pixi run python scripts/T2M/process_t2m_regions.py
+python -m http.server 8080
 ```
 
-Reads the `T2M_India_YYYYMM.nc` files generated in Step 7.
-
-The script:
-
-1. Rebuilds the state/UT geographical masks.
-2. Recalculates area-weighted mean temperatures.
-3. Calculates valid grid-cell counts for India and each state/UT.
-4. Generates a validation report.
-5. Generates a missing-months report.
-
-> **Important:** Step 8 overwrites the regional reports generated by Step 7.
-
-The Step 8 CSV files contain fewer statistical columns (mean temperature and valid grid cells), use `state` instead of `state_ut`, and use the `YYYYMM` date format instead of `YYYY-MM`.
-
-Skip Step 8 if you need the median, minimum, and maximum temperature statistics generated by Step 7.
-
----
-
-## 5. Regional Output Files
-
-Both CDD and T2M workflows generate regional outputs inside:
-
-```text
-data/processed/regional_timeseries/
-```
-
-### CDD Outputs
-
-| File | Description |
-|------|-------------|
-| `cdd_india_monthly.csv` | Monthly CDD statistics for India as a whole |
-| `cdd_state_monthly.csv` | Monthly CDD statistics for individual states and UTs |
-| `cdd_validation_report.csv` | Validation information for processed CDD datasets |
-
-### T2M Outputs
-
-| File | Description |
-|------|-------------|
-| `t2m_india_monthly.csv` | Monthly temperature statistics for India |
-| `t2m_state_monthly.csv` | Monthly temperature statistics for each state/UT |
-| `t2m_validation_report.csv` | Per-file status, valid grid cells, and temperature range |
-| `t2m_missing_months.txt` | Months missing from the expected January 2000 to September 2026 range |
-
-The T2M processing scripts also generate intermediate monthly NetCDF datasets in:
-
-```text
-data/processed/monthly_grid/temperature/
-data/processed/monthly_grid/temperature_india/
-```
-
-These intermediate files are required for regional analysis.
-
----
-
-## 6. India State and UT Boundary Data
-
-Both workflows use the same geographical reference file:
-
-```text
-data/reference/india_states_ut.geojson
-```
-
-This file contains the geographical boundaries of Indian states and union territories.
-
-The GeoJSON file must contain a property/column named:
-
-```text
-shapeName
-```
-
-The `shapeName` values are used to identify individual states and union territories during regional analysis.
-
-Make sure the boundary file is available before running the CDD or T2M regional processing scripts.
-
----
-
-## 7. Running the Dashboard Locally
-
-The project includes an interactive web dashboard inside the `UI/` directory.
-
-The dashboard visualizes the processed climate data using an interactive map.
-
-### Step 1. Navigate to the UI directory
-
-From the project root:
-
-```bash
-cd UI
-```
-
-### Step 2. Start a local web server
-
-Run:
-
-```bash
-python3 -m http.server 8080
-```
-
-### Step 3. Open the dashboard
-
-Open the following URL in your browser:
+Open your browser and visit:
 
 ```text
 http://localhost:8080
 ```
 
-> **Important:** Always run the dashboard through a local web server. Do not open `index.html` by double-clicking it.
+**Important:** Run the dashboard through a local HTTP server rather than opening `index.html` directly. The application loads its data files using browser fetch requests.
 
-### Why use a local web server?
+## &#x20;Expected Outputs
 
-Opening `index.html` directly from disk results in a `file://` URL.
+The processing workflows generate regional datasets and supporting reports.
 
-When opened this way, map tiles may display an "API key required" or "access blocked" warning, or fail to load entirely.
+Examples include:
 
-The map tile providers (OpenStreetMap and CARTO) may check the HTTP `Referer` header to validate requests.
+| File                        | Purpose                              |
+| --------------------------- | ------------------------------------ |
+| `t2m_india_monthly.csv`     | Monthly India temperature statistics |
+| `t2m_state_monthly.csv`     | State/UT temperature statistics      |
+| `cdd_india_monthly.csv`     | Monthly India CDD statistics         |
+| `cdd_state_monthly.csv`     | State/UT CDD statistics              |
+| `t2m_validation_report.csv` | Temperature data validation          |
+| `cdd_validation_report.csv` | CDD data validation                  |
 
-A page opened through `file://` does not send the expected HTTP `Referer` information.
-
-Serving the dashboard through:
-
-```bash
-python3 -m http.server 8080
-```
-
-allows the browser to access it through `http://localhost`, enabling the required HTTP requests.
-
-### Dashboard Troubleshooting
-
-**Map looks incorrect after editing `map.js`:**
-
-Perform a hard refresh:
-
-- macOS: `Cmd + Shift + R`
-- Windows/Linux: `Ctrl + Shift + R`
-
-**Blank map:**
-
-Open the browser developer console:
-
-- macOS: `Cmd + Option + J`
-- Windows/Linux: `F12`
-
-Check for JavaScript errors.
-
-**Map tiles do not load:**
-
-- Check your internet connection.
-- Make sure the local web server is running.
-- Check the browser console for network or tile-loading errors.
-- Leaflet and the online map tiles require internet access unless bundled locally.
+The dashboard also expects precipitation CSV files and CDD prediction results where the corresponding features are used.
 
 ---
 
-## 8. Important Notes and Recommendations
+## Project Impact
 
-- Always execute Python scripts from the `orbitNova` project root.
-- Use `pixi run python` to execute scripts within the project environment.
-- Complete NASA Earthdata authentication before running download scripts.
-- The sample download and extraction steps can be skipped if sample datasets have already been downloaded and inspected.
-- Complete the relevant validation steps before performing regional analysis.
-- Ensure `data/reference/india_states_ut.geojson` is available before running state/UT analysis.
-- The full historical download can take considerable time depending on network speed and NASA Earthdata availability.
-- Do not delete intermediate monthly NetCDF files before completing regional analysis.
-- The T2M processing period is currently configured for January 2000 to September 2026. Update `END_DATE` and `EXPECTED_MONTHS` in the relevant scripts if the study period changes.
-- Running `process_t2m_regions.py` after `process_t2m_india.py` overwrites the T2M regional CSV and report files with a reduced set of statistics.
-- Run the dashboard using a local HTTP server rather than opening the HTML file directly.
+Earth Trend Detective aims to make climate information more understandable and accessible.
 
----
+Potential applications include:
 
-## 9. Recommended Execution Sequence
-
-The following summarizes the recommended execution order for both climate variables.
-
-### CDD Workflow
-
-1. Check NASA CDD collection and version.
-2. Download a sample CDD dataset.
-3. Inspect the sample dataset.
-4. Test India-region extraction.
-5. Download and extract all monthly CDD datasets.
-6. Validate the extracted CDD datasets.
-7. Inspect India state/UT boundaries.
-8. Generate state/UT and India-level CDD statistics.
-9. Check the final regional outputs.
-
-### T2M Workflow
-
-1. Check the NASA MERRA-2 T2M collection.
-2. Download a sample T2M dataset.
-3. Inspect the sample dataset.
-4. Test India-region extraction.
-5. Download and extract all monthly T2M datasets.
-6. Validate the extracted T2M datasets (after implementing the validation script).
-7. Convert temperature to Celsius and generate regional statistics.
-8. Optionally regenerate regional statistics from the Celsius grids.
-
-### Dashboard
-
-After the regional CSV files have been generated:
-
-```bash
-cd UI
-python3 -m http.server 8080
-```
-
-Open:
-
-```text
-http://localhost:8080
-```
+- Identifying regions experiencing significant temperature changes.
+- Understanding regional precipitation variations.
+- Investigating changing dry-day patterns.
+- Supporting climate research and environmental studies.
+- Providing useful regional information for climate adaptation and planning.
+- Helping users explore climate patterns beyond national averages.
 
 ---
 
-## 10. Project Documentation
+## Future Scope
 
-Additional project documentation is available in:
+Our planned directions for further development include:
 
-```text
-docs/PHASE_3_CDD_REPORT.md
-```
-
-This document contains supplementary information about the CDD analysis.
+- Expanding climate indicators beyond the current variables.
+- Improving predictive modelling and validation.
+- Incorporating additional satellite and climate datasets.
+- Developing finer geographical analysis, including district-level trends.
+- Improving historical and future climate comparisons.
+- Enhancing regional climate risk interpretation.
+- Making the platform more accessible to researchers and policymakers.
 
 ---
 
-## Project Summary
+## &#x20;Team
 
-The orbitNova project provides an integrated workflow for processing and visualizing NASA MERRA-2 climate data over India.
+**Project:** Earth Trend Detective
+**Repository:** [orbitNova](https://github.com/codeincs387-droid/orbitNova)
+This repository is maintained through a dedicated team GitHub account created exclusively for this project.
 
-It combines:
+All team members have actively contributed to the development of Earth Trend Detective, collaborating on different aspects of the project, including:
 
-- **NASA Earthdata integration** for retrieving historical climate datasets.
-- **NetCDF processing** for extracting and managing monthly gridded climate data.
-- **Geospatial analysis** for identifying Indian states and union territories.
-- **Statistical analysis** for calculating regional and national climate indicators.
-- **Data validation** for checking monthly coverage and dataset consistency.
-- **Interactive visualization** through a locally hosted web dashboard.
+Developed as a team project to investigate regional climate trends and make climate data more meaningful through data science, geospatial technology and interactive visualization.
 
-The final outputs support the analysis of monthly Cooling Degree Days and 2-metre air temperature patterns across India at both national and state/UT levels.
+---
+
+## &#x20;License
+
+This project is licensed under the MIT License. See the `LICENSE` file for details.
+
+---
+
+**Earth Trend Detective — Because climate change is not the same everywhere.** 
