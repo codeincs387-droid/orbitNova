@@ -37,7 +37,7 @@ from sklearn.metrics import r2_score
 from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit
 
 # ---------------- settings ----------------
-LEAD = 0
+LEAD = 1
 USE_CLIMATE = True
 USE_PRECIP = True
 ANOMALY = True
@@ -209,7 +209,7 @@ per_state = {s: {"rf": rmse(g, "pred"), "base": rmse(g, "base"), "mae": mae(g, "
                  "wape": float(100 * (g.pred - g.cdd).abs().sum() / max(g.cdd.sum(), 1e-9)),
                  "r2": float(r2_score(g.cdd, g.pred)), "n": int(len(g))} for s, g in te.groupby("state_ut")}
 overall = {"rf": score(te, "pred"), "base": score(te, "base")}
-overall["skill_pct"] = float(100 * (1 - overall["rf"]["RMSE"] ** 2 / overall["base"]["RMSE"] ** 2))
+overall["skill_pct"] = float(100 * (1 - overall["rf"]["RMSE"] ** 2 / max(overall["base"]["RMSE"] ** 2, 1e-12)))
 
 # feature importance: permutation importance on the held-out test years (same method for any model)
 pi = permutation_importance(model, test[FEATURES], y_te, n_repeats=3, random_state=42, n_jobs=-1,
@@ -217,7 +217,11 @@ pi = permutation_importance(model, test[FEATURES], y_te, n_repeats=3, random_sta
 imp = np.clip(pi.importances_mean, 0, None); imp = imp / imp.sum() if imp.sum() > 0 else imp
 importance = dict(sorted(zip(FEATURES, map(float, imp)), key=lambda t: -t[1]))
 metrics = {"model": MODEL_NAME, "test": overall, "per_state": per_state, "importance": importance}
-(OUT / "model_metrics.json").write_text(json.dumps(metrics, indent=2))
+def clean(o):   # NaN/inf are not valid JSON: write null so the dashboard can always load the files
+    if isinstance(o, dict): return {k: clean(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)): return [clean(v) for v in o]
+    return None if isinstance(o, float) and not np.isfinite(o) else o
+(OUT / "model_metrics.json").write_text(json.dumps(clean(metrics), indent=2))
 
 t = overall
 print(f"\n=== Test {TEST_START}-{TEST_END} ({MODEL_NAME}) ===")
@@ -268,5 +272,5 @@ js = {"meta": {"lead": LEAD, "model": MODEL_NAME, "unit": "days", "trainStart": 
       "mean": {"act": rnd(ma), "pred": rnd(mp), "base": rnd(mb),
                "test": {"rf": r_rf, "base": r_b, "r2": r2_rf, "n": n_t}},
       "importance": importance, "overall": overall}
-(OUT / "dashboard_data.json").write_text(json.dumps(js, ensure_ascii=False), encoding="utf-8")
+(OUT / "dashboard_data.json").write_text(json.dumps(clean(js), ensure_ascii=False), encoding="utf-8")
 print("\nDone. UI data:", OUT / "dashboard_data.json", "\nServe the project root: python3 -m http.server 8080")

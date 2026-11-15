@@ -179,6 +179,7 @@ function updateUI() {
   info._div.innerHTML = selected
     ? "<b>" + selected + "</b><br>" + (districtsOf[selected] || []).length + " districts &middot; click another state to switch"
     : "<b>India</b><br>" + STATES.length + " states &amp; UTs &middot; click a state to see its districts";
+  document.dispatchEvent(new Event("regionchange"));
 }
 document.addEventListener("keydown", e => { if (e.key === "Escape" && selected) resetView(); });
 

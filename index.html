@@ -38,7 +38,9 @@ h1{font-size:22px;font-weight:700;margin:0;letter-spacing:-.02em}
 .tip{position:absolute;pointer-events:none;background:var(--ink);color:#fff;font-size:12.5px;padding:4px 9px;border-radius:8px;white-space:nowrap;transform:translate(-50%,-130%);opacity:0}
 /* time period selector */
 .tps{padding:14px 16px;display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center}
-.seg{display:flex;background:var(--bg);padding:3px;border-radius:11px}
+.seg{display:flex;flex-wrap:wrap;background:var(--bg);padding:3px;border-radius:11px}
+.seg button:focus-visible{outline:2px solid var(--acc)}
+.vsel{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .seg button{border:0;background:none;font:500 13px Figtree,sans-serif;color:var(--mute);padding:7px 12px;border-radius:8px;cursor:pointer}
 .seg button.on{background:#fff;color:var(--acc);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 .ctl{display:none;gap:8px;align-items:center;flex-wrap:wrap}.ctl.on{display:flex}
@@ -90,8 +92,8 @@ h1{font-size:22px;font-weight:700;margin:0;letter-spacing:-.02em}
 @media(max-width:900px){.dash{grid-template-columns:1fr}.mapcard{min-height:380px}}
 </style></head>
 <body><div class="wrap">
-<header><div><h1>India temperature trends</h1><div class="sub" id="region">India</div></div>
-<div class="sub">Click a state on the map to see its trend</div></header>
+<header><div><h1 id="h1">India temperature trends</h1><div class="sub" id="region">India</div></div>
+<div class="vsel"><div class="seg" id="vars"><button data-v="t2m" class="on">Temperature</button><button data-v="prec">Precipitation</button><button data-v="cdd">Dry days (CDD)</button></div><div class="sub">Click a state on the map to see its trend</div></div></header>
 <div class="dash">
   <div class="left">
     <div class="card mapcard"><div id="map"></div></div>
@@ -123,7 +125,7 @@ h1{font-size:22px;font-weight:700;margin:0;letter-spacing:-.02em}
     <section class="sec"><h2>Gist</h2><p class="gist" id="gist"></p></section>
   </aside>
   <section class="card chartcard"><h2 id="ctitle">Trend</h2><div class="t" id="csub"></div><div id="chart"></div>
-    <div class="note">Data: monthly mean 2 m air temperature (°C) per state/UT from <code>data/processed/regional_timeseries/t2m_*_monthly.csv</code>. Annual means compare each month with its long-term average, so years with a few missing months are still included (needs at least 6 months).</div></section>
+    <div class="note" id="cnote"></div></section>
 
   <!-- ===== Consecutive dry days: actual vs Random Forest prediction (train_cdd_rf.py) ===== -->
   <section class="card cddcard" id="cdd">
@@ -169,10 +171,8 @@ const GEO_URLS=["data/reference/india_states_ut.geojson","../data/reference/indi
 const getJSON=async urls=>{let last;for(const u of urls){try{const r=await fetch(u);if(r.ok)return await r.json();last=new Error(u+" ("+r.status+")")}catch(e){last=e}}throw last};
 
 let api=null;
-// Keep this section in step with the main Leaflet map's selection
-const _ss=window.selectState,_rv=window.resetView;
-if(typeof _ss==="function")window.selectState=function(){const r=_ss.apply(this,arguments);if(api)api.pick(typeof selected!=="undefined"?selected:null);return r};
-if(typeof _rv==="function")window.resetView=function(){const r=_rv.apply(this,arguments);if(api)api.pick(null);return r};
+// Keep this section in step with the main Leaflet map (map.js fires "regionchange" on every selection)
+document.addEventListener("regionchange",()=>{if(api)api.pick(typeof selected!=="undefined"?selected:null)});
 
 Promise.all([getJSON(DATA_URLS),getJSON(GEO_URLS)]).then(([d,g])=>init(d,g)).catch(e=>{
   const s=E("c-sub");s.className="csub err";
@@ -271,7 +271,7 @@ E("c-vmax").textContent=f(vmax,1);E("c-dm1").textContent=`−${f(dmax,1)} (too l
 addEventListener("resize",chart);
 
 // called when the main Leaflet map selection changes (name, or null for the whole of India)
-api={pick(name){const i=S.indexOf(name);sel=i;E("c-st").value=i;show()}};
+api={pick(name){const i=name==null?-1:S.findIndex(n=>skey(n)===skey(name));sel=i;E("c-st").value=i;show()}};
 // start in step with whatever the main map already has selected
 api.pick(typeof selected!=="undefined"?selected:null);
 }
