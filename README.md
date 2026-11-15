@@ -106,3 +106,27 @@ Checks regional coverage, duplicate records, missing values, and valid grid-cell
 ```text
 data/processed/regional_timeseries/
 ```
+
+---
+
+## Running the Dashboard Locally
+
+Always run the dashboard through a local web server. Do not open `index.html` by double-clicking it.
+
+From the folder that contains `index.html`, run:
+
+```bash
+python3 -m http.server 8080
+```
+
+Then open <http://localhost:8080> in your browser.
+
+### Why not open the file directly?
+
+If you open `index.html` straight from disk (the address starts with `file://`), the map tiles can show an "API key required" or "access blocked" warning, or fail to load. The tile providers (OpenStreetMap, CARTO) expect requests to come from a real website and check the HTTP `Referer` header. A page opened from `file://` sends no `Referer`, so the tiles are rejected. Served through `python3 -m http.server`, the page is on `http://localhost`, the browser sends the `Referer`, and the tiles load normally.
+
+### Troubleshooting
+
+- **Map looks wrong after editing `map.js`:** hard refresh with Cmd+Shift+R (Ctrl+Shift+R on Windows/Linux). The Python server lets the browser cache files.
+- **Blank map:** open the browser console (Cmd+Option+J / F12) and check for a red error.
+- **Tiles never load:** make sure you are online. Leaflet and the map tiles need internet access unless they are bundled locally.
