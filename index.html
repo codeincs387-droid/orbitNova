@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>India temperature trends</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="UI/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f5f6f5;--card:#fff;--ink:#16201f;--mute:#6c7776;--line:#e4e8e7;--acc:#3454d1;--accbg:#edf0fc;--warm:#c4452d;--r:18px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Figtree,system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto;padding:28px 20px 40px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+h1{font-size:22px;font-weight:700;margin:0;letter-spacing:-.02em}
+.sub{color:var(--mute);font-size:14px}
+.dash{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.left{display:flex;flex-direction:column;gap:16px;min-width:0}
+.mapcard{flex:1;min-height:440px;position:relative}
+#map{position:absolute;inset:0}
+.side{display:flex;flex-direction:column}
+.sec{padding:20px 22px;border-bottom:1px solid var(--line)}
+.sec:last-child{border:0}
+.sec h2{font-size:13px;font-weight:600;color:var(--mute);margin:0 0 12px}
+.big{font-size:40px;font-weight:700;letter-spacing:-.03em;line-height:1}
+.big small{font-size:15px;font-weight:500;color:var(--mute);margin-left:6px;letter-spacing:0}
+.big.up{color:var(--warm)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);margin-top:16px}
+.stats div{padding-right:10px}.stats div+div{padding-left:14px;border-left:1px solid var(--line)}
+.stats.more{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.stats b{display:block;font-size:17px;font-weight:600}.stats span{font-size:12.5px;color:var(--mute)}
+.stats.more b{font-size:15px}
+.gist{margin:0;color:#2c3837}
+.chartcard{grid-column:1/-1;padding:20px 22px}
+.chartcard h2{font-size:13px;font-weight:600;color:var(--mute);margin:0 0 4px}
+.chartcard .t{font-size:17px;font-weight:600;margin-bottom:10px}
+#chart{position:relative;width:100%}
+#chart svg{display:block;width:100%}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:#fff;font-size:12.5px;padding:4px 9px;border-radius:8px;white-space:nowrap;transform:translate(-50%,-130%);opacity:0}
+/* time period selector */
+.tps{padding:14px 16px;display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center}
+.seg{display:flex;background:var(--bg);padding:3px;border-radius:11px}
+.seg button{border:0;background:none;font:500 13px Figtree,sans-serif;color:var(--mute);padding:7px 12px;border-radius:8px;cursor:pointer}
+.seg button.on{background:#fff;color:var(--acc);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.ctl{display:none;gap:8px;align-items:center;flex-wrap:wrap}.ctl.on{display:flex}
+.ctl select{font:500 13px Figtree,sans-serif;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
+.ctl .to{color:var(--mute);font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chips label{cursor:pointer}.chips input{position:absolute;opacity:0}
+.chips span{display:block;padding:5px 9px;font-size:12.5px;border:1px solid var(--line);border-radius:8px;color:var(--mute)}
+.chips input:checked+span{background:var(--accbg);border-color:var(--acc);color:var(--acc);font-weight:600}
+.chips input:focus-visible+span{outline:2px solid var(--acc)}
+.note{font-size:12px;color:var(--mute);margin-top:14px}
+
+/* ---------- CDD prediction section (all rules scoped to .cddcard) ---------- */
+.cddcard{grid-column:1/-1;padding:20px 22px;--act:#16201f;--prd:#c4452d;--tr:#9db8a2;--te:#e0b24f}
+.cddcard h2{font-size:13px;font-weight:600;color:var(--mute);margin:0 0 4px}
+.cddcard .t{font-size:17px;font-weight:600;margin-bottom:6px}
+.cddcard h3{font-size:13px;font-weight:600;color:var(--mute);margin:26px 0 8px}
+.cddcard .csub{color:var(--mute);font-size:14px;margin:0 0 6px;max-width:80ch}
+.cddcard .csub.err{color:var(--warm);font-weight:600}
+.cddcard .cnote{font-size:12.5px;color:var(--mute);margin-top:8px}
+.cddcard table{border-collapse:collapse;width:100%}
+.cddcard th,.cddcard td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--line)}
+.cddcard th:first-child,.cddcard td:first-child{text-align:left}
+.cddcard th{color:var(--mute);font-weight:500;font-size:13px}
+.cddcard tr.key td{font-weight:600}
+.cddcard details{margin-top:12px}.cddcard summary{cursor:pointer;font-weight:500;font-size:14px}
+.cddcard .cc{display:flex;gap:12px;align-items:center;margin:8px 0 14px;flex-wrap:wrap}
+.cddcard .cc input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+.cddcard button,.cddcard select{font:500 13px Figtree,sans-serif;padding:7px 12px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
+.cddcard button{cursor:pointer}
+.cddcard button:focus-visible,.cddcard input:focus-visible,.cddcard select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.cddcard canvas#c-ts{width:100%;height:280px;display:block;cursor:crosshair}
+.cddcard .cmaps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.cddcard .cmaps figure{margin:0}
+.cddcard .cmaps canvas{width:100%;display:block;cursor:pointer}
+.cddcard .cmaps figcaption{color:var(--mute);font-size:13px}
+.cddcard .cbar{height:10px;border-radius:2px;margin-top:6px}
+.cddcard .clg{display:flex;justify-content:space-between;color:var(--mute);font-size:12px}
+.cddcard .imp{display:grid;grid-template-columns:130px 1fr 52px;gap:10px;align-items:center;font-size:13px;margin:3px 0}
+.cddcard .imp .ib{height:10px;background:var(--line);border-radius:2px;overflow:hidden}
+.cddcard .imp .ib i{display:block;height:100%;background:var(--warm)}
+.cddcard .imp b{font-weight:500;text-align:right}
+.cddcard .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0 4px}
+.cddcard .kpi{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.cddcard .kpi b{display:block;font-size:22px;font-weight:700;letter-spacing:-.02em}
+.cddcard .kpi span{font-size:12.5px;color:var(--mute)}
+.cddcard .kpi em{display:block;font-size:12px;color:var(--mute);font-style:normal;margin-top:2px}
+
+@media(max-width:900px){.dash{grid-template-columns:1fr}.mapcard{min-height:380px}}
+</style></head>
+<body><div class="wrap">
+<header><div><h1>India temperature trends</h1><div class="sub" id="region">India</div></div>
+<div class="sub">Click a state on the map to see its trend</div></header>
+<div class="dash">
+  <div class="left">
+    <div class="card mapcard"><div id="map"></div></div>
+    <div class="card tps" id="tps"></div>
+  </div>
+  <aside class="card side">
+    <section class="sec"><h2>Summary</h2>
+      <div class="big" id="change">–</div>
+      <div class="stats">
+        <div><b id="pv">–</b><span>p-value</span></div>
+        <div><b id="sl">–</b><span id="slu">Slope</span></div>
+        <div><b id="ic">–</b><span>Intercept</span></div>
+      </div>
+      <div class="stats more">
+        <div><b id="r2">–</b><span>R² (fit)</span></div>
+        <div><b id="se">–</b><span id="seu">Slope std. error</span></div>
+        <div><b id="ci">–</b><span>95% CI of slope</span></div>
+      </div>
+      <div class="stats more">
+        <div><b id="np">–</b><span>Data points</span></div>
+        <div><b id="mean">–</b><span>Mean</span></div>
+        <div><b id="sd">–</b><span>Std. deviation</span></div>
+      </div>
+      <div class="stats more">
+        <div><b id="hi">–</b><span id="hil">Highest</span></div>
+        <div><b id="lo">–</b><span id="lol">Lowest</span></div>
+        <div><b id="fit">–</b><span>Fitted start → end</span></div>
+      </div></section>
+    <section class="sec"><h2>Gist</h2><p class="gist" id="gist"></p></section>
+  </aside>
+  <section class="card chartcard"><h2 id="ctitle">Trend</h2><div class="t" id="csub"></div><div id="chart"></div>
+    <div class="note">Data: monthly mean 2 m air temperature (°C) per state/UT from <code>data/processed/regional_timeseries/t2m_*_monthly.csv</code>. Annual means compare each month with its long-term average, so years with a few missing months are still included (needs at least 6 months).</div></section>
+
+  <!-- ===== Consecutive dry days: actual vs Random Forest prediction (train_cdd_rf.py) ===== -->
+  <section class="card cddcard" id="cdd">
+    <h2>Model results</h2>
+    <div class="t" id="c-title">Consecutive dry days (CDD): actual vs model prediction</div>
+    <p class="csub" id="c-sub">Loading…</p>
+    <div id="c-body" hidden>
+      <h3>Error rate, all states and UTs (test period)</h3>
+      <div class="kpis" id="c-kpis"></div>
+      <table id="c-m"><thead><tr><th>Test period</th><th>MAE (days)</th><th>RMSE (days)</th><th>Error rate</th><th>Within ±3 days</th><th>R²</th></tr></thead><tbody></tbody></table>
+      <p class="cnote"><b>MAE</b> is the average miss in days. <b>Error rate</b> is total absolute error as a % of total actual CDD. <b>Skill</b> compares the model's squared error with the climatology baseline (each state's training-period average for that calendar month): 0% means no better than the average, positive means better.</p>
+      <details><summary>Accuracy by state/UT</summary><table id="c-ps"><thead><tr><th>State/UT</th><th>MAE (model)</th><th>MAE (climatology)</th><th>RMSE (model)</th><th>RMSE (climatology)</th><th>Error rate</th><th>R²</th></tr></thead><tbody></tbody></table></details>
+      <details open><summary>Most important model features</summary><div id="c-imp" style="margin-top:8px"></div></details>
+
+      <h3>Monthly CDD</h3>
+      <div class="cc"><label>Show <select id="c-st" aria-label="State or UT"></select></label></div>
+      <p class="cnote" id="c-stat" style="margin:0 0 8px"></p>
+      <canvas id="c-ts" aria-label="Monthly CDD, actual and predicted"></canvas>
+      <p class="cnote">Click the chart to jump to a month (test period only). <span style="color:var(--act)">■</span> actual <span style="color:var(--prd)">■</span> predicted · bars: <span style="color:var(--tr)">■</span> training, <span style="color:var(--te)">■</span> test (training-period predictions are in-sample)</p>
+
+      <h3>Maps</h3>
+      <div class="cc"><button id="c-play">Play</button><input id="c-sl" type="range" min="0" value="0" aria-label="Month"><strong id="c-lab" style="min-width:5em;text-align:right"></strong></div>
+      <div class="cmaps">
+        <figure><canvas id="c-ca"></canvas><figcaption>Actual (days)</figcaption></figure>
+        <figure><canvas id="c-cp"></canvas><figcaption>Predicted (days)</figcaption></figure>
+        <figure><canvas id="c-cd"></canvas><figcaption>Predicted − actual (days)</figcaption></figure></div>
+      <div class="cmaps"><div><div class="cbar" style="background:linear-gradient(90deg,#fff5e1,#fdc878,#e16428,#781414)"></div><div class="clg"><span>0</span><span>CDD</span><span id="c-vmax"></span></div></div><div></div>
+      <div><div class="cbar" style="background:linear-gradient(90deg,#d95f02,#f4f1ea,#1b9e8a)"></div><div class="clg"><span id="c-dm1"></span><span></span><span id="c-dm2"></span></div></div></div>
+      <p class="cnote" id="c-info">Click a state on any of these maps (or on the main map above) to select it.</p>
+    </div>
+  </section>
+</div></div>
+<script src="UI/leaflet.js"></script>
+<script src="UI/map.js"></script>
+<script src="UI/dashboard.js"></script>
+<script>
+/* CDD model results. Wrapped in a function so its names never clash with dashboard.js / map.js. */
+(function(){
+const E=id=>document.getElementById(id),f=(x,n=2)=>x.toFixed(n);
+// Tried in order: works whether this page sits in the project root or in UI/
+const DATA_URLS=["data/predictions_cdd/dashboard_data.json","../data/predictions_cdd/dashboard_data.json"];
+const GEO_URLS=["data/reference/india_states_ut.geojson","../data/reference/india_states_ut.geojson"];
+const getJSON=async urls=>{let last;for(const u of urls){try{const r=await fetch(u);if(r.ok)return await r.json();last=new Error(u+" ("+r.status+")")}catch(e){last=e}}throw last};
+
+let api=null;
+// Keep this section in step with the main Leaflet map's selection
+const _ss=window.selectState,_rv=window.resetView;
+if(typeof _ss==="function")window.selectState=function(){const r=_ss.apply(this,arguments);if(api)api.pick(typeof selected!=="undefined"?selected:null);return r};
+if(typeof _rv==="function")window.resetView=function(){const r=_rv.apply(this,arguments);if(api)api.pick(null);return r};
+
+Promise.all([getJSON(DATA_URLS),getJSON(GEO_URLS)]).then(([d,g])=>init(d,g)).catch(e=>{
+  const s=E("c-sub");s.className="csub err";
+  s.textContent="Could not load model results ("+e.message+"). Run scripts/train_cdd_rf.py first, then serve the project root with: python3 -m http.server 8080"});
+
+// thin out polygon vertices so redraws stay fast
+function thin(r,tol){const o=[r[0]];let l=r[0];for(let i=1;i<r.length-1;i++){const p=r[i];if(Math.hypot(p[0]-l[0],p[1]-l[1])>=tol){o.push(p);l=p}}o.push(r[r.length-1]);return o}
+function polys(g){const P=g.type=="Polygon"?[g.coordinates]:g.type=="MultiPolygon"?g.coordinates:[];
+ return P.map(rings=>{const t=rings.map(r=>thin(r,.03));return t[0].length<4?null:t.filter(r=>r.length>=4)}).filter(Boolean)}
+const lerp=(st,t)=>{t=Math.max(0,Math.min(1,t));for(let i=1;i<st.length;i++)if(t<=st[i][0]){const[a,A]=st[i-1],[b,B]=st[i],u=(t-a)/(b-a);return A.map((v,j)=>v+(B[j]-v)*u)}return st.at(-1)[1]};
+const G=[[0,[255,245,225]],[.35,[253,200,120]],[.65,[225,100,40]],[1,[120,20,20]]],V=[[0,[217,95,2]],[.5,[244,241,234]],[1,[27,158,138]]];
+// even-odd point-in-polygon across all rings (handles holes)
+const inside=(pt,rings)=>{let c=false;for(const poly of rings)for(let i=0,j=poly.length-1;i<poly.length;j=i++){const[xi,yi]=poly[i],[xj,yj]=poly[j];if((yi>pt[1])!=(yj>pt[1])&&pt[0]<(xj-xi)*(pt[1]-yi)/(yj-yi)+xi)c=!c}return c};
+
+function init(js,gj){
+const mdl_=()=>js.meta.model||"model";
+const M=js.meta,SP=js.states,S=SP.map(s=>s.name),dates=js.dates,O=js.overall,root=E("cdd");
+const mapDates=dates.filter(d=>+d.slice(0,4)>=M.testStart),vmax=M.vmax,dmax=M.dmax;
+const byName={};gj.features.forEach(ft=>byName[ft.properties.shapeName]=polys(ft.geometry));
+const missing=S.filter(n=>!byName[n]);if(missing.length)console.warn("No boundary for:",missing);
+const geo=S.map(n=>byName[n]||[]);
+
+E("c-body").hidden=false;
+E("c-sub").textContent=`Monthly consecutive dry days (CDD) per state/UT. The ${mdl_()} model ${M.lead?"forecasts "+M.lead+" month(s) ahead":"estimates each month"} from CDD history, temperature and precipitation${M.lead?"":" (including that month's own values, so this is an estimate, not a forecast)"}. Trained on ${M.trainStart}–${M.trainEnd}, tested on ${M.testStart}–${M.testEnd}.`;
+
+// accuracy tables and headline error figures
+const nf=(x,d=2)=>x==null||!isFinite(x)?"–":f(x,d),M_=O.rf,B_=O.base,mdl=M.model||"Model";
+const row=(lab,r,key)=>{const t=document.createElement("tr");if(key)t.className="key";
+t.innerHTML=`<td>${lab}</td><td>${nf(r.MAE)}</td><td>${nf(r.RMSE)}</td><td>${nf(r.error_pct,1)}%</td><td>${nf(r.within3,1)}%</td><td>${nf(r.R2,3)}</td>`;E("c-m").tBodies[0].append(t)};
+row(`${mdl} · ${M.testStart}–${M.testEnd}`,M_,true);row("Climatology baseline",B_,false);
+const kp=(v,l,s)=>`<div class="kpi"><b>${v}</b><span>${l}</span>${s?`<em>${s}</em>`:""}</div>`,sk=O.skill_pct;
+E("c-kpis").innerHTML=kp(nf(M_.MAE)+" days","Mean error (MAE)","climatology "+nf(B_.MAE))
+ +kp(nf(M_.RMSE)+" days","RMSE","climatology "+nf(B_.RMSE))
+ +kp(nf(M_.error_pct,1)+"%","Error rate","climatology "+nf(B_.error_pct,1)+"%")
+ +kp(nf(M_.within3,0)+"%","Within ±3 days","climatology "+nf(B_.within3,0)+"%")
+ +kp(sk==null?"–":(sk>=0?"+":"")+nf(sk,1)+"%","Skill vs climatology","0% = no better than average");
+E("c-title").textContent=`Consecutive dry days (CDD): actual vs ${mdl} prediction`;
+SP.filter(s=>s.test).sort((a,b)=>a.test.rf-b.test.rf).forEach(s=>{const t=document.createElement("tr"),r=s.test;
+t.innerHTML=`<td>${s.name}</td><td>${nf(r.mae)}</td><td>${nf(r.mae_base)}</td><td>${nf(r.rf)}</td><td>${nf(r.base)}</td><td>${nf(r.wape,1)}%</td><td>${nf(r.r2,3)}</td>`;E("c-ps").tBodies[0].append(t)});
+
+// feature importance
+const imp=Object.entries(js.importance||{}).slice(0,10),top=imp.length?imp[0][1]:1;
+E("c-imp").innerHTML=imp.map(([n,v])=>`<div class="imp"><span>${n}</span><div class="ib"><i style="width:${(v/top*100).toFixed(1)}%"></i></div><b>${f(v,3)}</b></div>`).join("");
+
+E("c-st").innerHTML=`<option value="-1">All states (mean)</option>`+S.map((n,i)=>`<option value="${i}">${n}</option>`).join("");
+
+let sel=-1,cur=mapDates.length-1;const sl=E("c-sl");sl.max=cur;
+const di=()=>dates.indexOf(mapDates[cur]);
+
+// map geometry (equirectangular, cos-corrected)
+let lo=[1e9,1e9],hi=[-1e9,-1e9];geo.forEach(ps=>ps.forEach(p=>p.forEach(r=>r.forEach(([x,y])=>{lo=[Math.min(lo[0],x),Math.min(lo[1],y)];hi=[Math.max(hi[0],x),Math.max(hi[1],y)]}))));
+const cs=Math.cos((lo[1]+hi[1])/2*Math.PI/180),W=420,sc=W/((hi[0]-lo[0])*cs),H=Math.round((hi[1]-lo[1])*sc);
+const px=([x,y])=>[(x-lo[0])*cs*sc,(hi[1]-y)*sc];
+const cv=n=>getComputedStyle(root).getPropertyValue(n).trim();
+
+function drawMap(id,color){const c=E(id);c.width=W*2;c.height=H*2;c.style.aspectRatio=W+"/"+H;const x=c.getContext("2d");x.scale(2,2);
+const line=cv("--ink"),grey="#d4d9d8";
+geo.forEach((ps,i)=>{const col=color(i);x.fillStyle=col?`rgb(${col.map(Math.round)})`:grey;
+x.beginPath();ps.forEach(p=>p.forEach(r=>{r.forEach((q,j)=>{const[a,b]=px(q);j?x.lineTo(a,b):x.moveTo(a,b)});x.closePath()}));
+x.fill("evenodd");x.strokeStyle=line;x.globalAlpha=i==sel?1:.25;x.lineWidth=i==sel?2:.5;x.stroke();x.globalAlpha=1})}
+
+function maps(){const k=di(),a=i=>SP[i].act[k],p=i=>SP[i].pred[k];
+drawMap("c-ca",i=>a(i)!=null?lerp(G,a(i)/vmax):null);
+drawMap("c-cp",i=>p(i)!=null?lerp(G,p(i)/vmax):null);
+drawMap("c-cd",i=>a(i)!=null&&p(i)!=null?lerp(V,(p(i)-a(i))/(2*dmax)+.5):null);
+E("c-lab").textContent=mapDates[cur];
+if(sel>=0){const a2=a(sel)!=null?f(a(sel)):"–",p2=p(sel)!=null?f(p(sel)):"–";E("c-info").textContent=`${S[sel]}, ${mapDates[cur]}: actual ${a2} days, predicted ${p2} days`}}
+
+["c-ca","c-cp","c-cd"].forEach(id=>E(id).onclick=e=>{const b=e.target.getBoundingClientRect(),X=(e.clientX-b.left)/b.width*W,Y=(e.clientY-b.top)/b.height*H,
+pt=[X/(cs*sc)+lo[0],hi[1]-Y/sc],i=geo.findIndex(ps=>ps.some(p=>inside(pt,p)));if(i>=0){sel=i;E("c-st").value=i;show()}});
+
+function chart(){const c=E("c-ts"),r=devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;if(!w)return;c.width=w*r;c.height=h*r;
+const x=c.getContext("2d");x.scale(r,r);
+const A=sel<0?js.mean.act:SP[sel].act,P=sel<0?js.mean.pred:SP[sel].pred;
+const L=40,T=30,B=22,n=dates.length,vals=A.concat(P).filter(v=>v!=null),lo2=Math.min(0,...vals),hi2=Math.max(...vals)*1.05;
+const X=i=>L+i/(n-1)*(w-L-8),Y=v=>T+(1-(v-lo2)/(hi2-lo2))*(h-T-B),yr=d=>+d.slice(0,4);
+const band=(y0,y1,yy,color)=>{const a=dates.findIndex(d=>yr(d)>=y0),b=dates.findLastIndex(d=>yr(d)<=y1);if(a<0||b<0)return;x.fillStyle=color;x.fillRect(X(a),yy,X(b)-X(a),6)};
+band(M.trainStart,M.trainEnd,4,cv("--tr"));band(M.testStart,M.testEnd,14,cv("--te"));
+x.fillStyle=cv("--mute");x.font="12px Figtree,system-ui,sans-serif";x.strokeStyle=cv("--line");
+for(let k=0;k<=4;k++){const v=lo2+(hi2-lo2)*k/4;x.beginPath();x.moveTo(L,Y(v));x.lineTo(w-8,Y(v));x.stroke();x.fillText(f(v,1),2,Y(v)+4)}
+for(let i=0;i<n;i++)if(dates[i].endsWith("-01")&&yr(dates[i])%5==0)x.fillText(dates[i].slice(0,4),X(i)-12,h-6);
+const line=(arr,color)=>{x.strokeStyle=color;x.lineWidth=1.6;x.beginPath();let up=false;arr.forEach((v,i)=>{if(v==null){up=false;return}up?x.lineTo(X(i),Y(v)):x.moveTo(X(i),Y(v));up=true});x.stroke()};
+line(A,cv("--act"));line(P,cv("--prd"));
+const k=di();x.strokeStyle=cv("--ink");x.lineWidth=1;x.setLineDash([3,3]);x.beginPath();x.moveTo(X(k),T-4);x.lineTo(X(k),h-B);x.stroke();x.setLineDash([])}
+
+function statline(){const r=sel>=0?SP[sel].test:null;
+E("c-stat").textContent=r?`${S[sel]} (test period): average miss ${nf(r.mae)} days, RMSE ${nf(r.rf)}, error rate ${nf(r.wape,1)}%, R² ${nf(r.r2,3)} (climatology MAE ${nf(r.mae_base)})`
+ :sel>=0?`${S[sel]}: no test-period accuracy available`:`All states (test period): average miss ${nf(M_.MAE)} days, error rate ${nf(M_.error_pct,1)}%`}
+function show(){sl.value=cur;maps();chart();statline()}
+sl.oninput=()=>{cur=+sl.value;show()};E("c-st").onchange=e=>{sel=+e.target.value;show()};
+E("c-ts").onclick=e=>{const b=e.target.getBoundingClientRect(),i=Math.round((e.clientX-b.left-40)/(b.width-48)*(dates.length-1)),
+j=mapDates.indexOf(dates[Math.max(0,Math.min(dates.length-1,i))]);if(j>=0){cur=j;show()}};
+let t=null;E("c-play").onclick=()=>{if(t){clearInterval(t);t=null;E("c-play").textContent="Play";return}E("c-play").textContent="Pause";
+t=setInterval(()=>{cur=(cur+1)%mapDates.length;show()},350)};
+E("c-vmax").textContent=f(vmax,1);E("c-dm1").textContent=`−${f(dmax,1)} (too low)`;E("c-dm2").textContent=`+${f(dmax,1)} (too high)`;
+addEventListener("resize",chart);
+
+// called when the main Leaflet map selection changes (name, or null for the whole of India)
+api={pick(name){const i=S.indexOf(name);sel=i;E("c-st").value=i;show()}};
+// start in step with whatever the main map already has selected
+api.pick(typeof selected!=="undefined"?selected:null);
+}
+})();
+</script>
+</body></html>

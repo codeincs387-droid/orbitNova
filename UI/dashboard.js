@@ -1,21 +1,23 @@
 // Dashboard: time-period selector, regression stats, gist, articles, trend chart.
+// Temperature data comes from data/processed/regional_timeseries/t2m_state_monthly.csv
+// and t2m_india_monthly.csv (monthly mean 2 m air temperature, degC).
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const $ = s => document.querySelector(s);
 
 /* ---------- reusable time period selector ---------- */
-function createTimePeriodSelector(root, { startYear = 1980, endYear = 2025, onChange = () => {} } = {}) {
+function createTimePeriodSelector(root, { startYear = 2000, endYear = 2025, defaultEnd = endYear, onChange = () => {} } = {}) {
   const yrs = id => `<select id="${id}">` + Array.from({ length: endYear - startYear + 1 }, (_, i) => endYear - i).map(y => `<option>${y}</option>`).join("") + "</select>";
   root.innerHTML = `
     <div class="seg">
-      <button data-m="range" class="on">Year range</button><button data-m="ym">Year &amp; months</button><button data-m="one">Single month</button></div>
+      <button data-m="range" class="on">Year range</button><button data-m="ym">Year &amp; months</button><button data-m="one">One month, all years</button></div>
     <div class="ctl on" data-c="range">${yrs("ya")}<span class="to">to</span>${yrs("yb")}</div>
     <div class="ctl" data-c="ym">${yrs("yc")}<div class="chips">${MONTHS.map((m, i) => `<label><input type="checkbox" value="${i}"><span>${m}</span></label>`).join("")}</div></div>
-    <div class="ctl" data-c="one">${yrs("yd")}<select id="mo">${MONTHS.map((m, i) => `<option value="${i}">${m}</option>`).join("")}</select></div>`;
+    <div class="ctl" data-c="one"><select id="mo">${MONTHS.map((m, i) => `<option value="${i}">${m}</option>`).join("")}</select><span class="to">in every year</span></div>`;
   const q = s => root.querySelector(s);
-  q("#ya").value = startYear; q("#yb").value = endYear; q("#yc").value = endYear; q("#yd").value = endYear;
+  q("#ya").value = startYear; q("#yb").value = defaultEnd; q("#yc").value = endYear;
   let mode = "range";
   const get = () => ({
-    mode, a: +q("#ya").value, b: +q("#yb").value, year: +q(mode === "ym" ? "#yc" : "#yd").value,
+    mode, a: +q("#ya").value, b: +q("#yb").value, year: +q("#yc").value,
     months: [...root.querySelectorAll(".chips input:checked")].map(c => +c.value), month: +q("#mo").value
   });
   root.querySelectorAll(".seg button").forEach(b => b.onclick = () => {
@@ -28,27 +30,99 @@ function createTimePeriodSelector(root, { startYear = 1980, endYear = 2025, onCh
   return { get };
 }
 
-/* ---------- demo data (replace with real data) ---------- */
-function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
-function rnd(s) { let a = hash(s); a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
-function monthTemp(r, y, m) {
-  const base = 18 + rnd(r + "b") * 10, trend = 0.012 + rnd(r + "t") * 0.04, amp = 3 + rnd(r + "a") * 6;
-  return base + trend * (y - 1980) + amp * Math.cos(2 * Math.PI * (m - 5) / 12) + (rnd(`${r}${y}-${m}`) - .5) * 1.6;
+/* ---------- real data: monthly T2M CSVs ---------- */
+// Tried in order, so this works whether the page is served from the project root or from UI/
+const DATA_DIRS = ["data/processed/regional_timeseries/", "../data/processed/regional_timeseries/"];
+async function getText(name) {
+  let err;
+  for (const d of DATA_DIRS) {
+    try { const r = await fetch(d + name); if (r.ok) return await r.text(); err = new Error(d + name + " (" + r.status + ")"); }
+    catch (e) { err = e; }
+  }
+  throw err;
+}
+function parseCSV(text) {
+  const rows = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const cells = []; let cur = "", quoted = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (quoted) { if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else quoted = false; } else cur += ch; }
+      else if (ch === '"') quoted = true;
+      else if (ch === ",") { cells.push(cur); cur = ""; }
+      else cur += ch;
+    }
+    cells.push(cur); rows.push(cells);
+  }
+  const head = rows.shift().map(s => s.trim());
+  return rows.map(r => Object.fromEntries(head.map((k, i) => [k, r[i]])));
+}
+const norm = s => String(s).toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]/g, "");
+// series[normalisedName] = { year: [12 monthly values, null where missing] }
+function addRows(series, rows, nameOf) {
+  if (!rows.length) return;
+  const col = Object.keys(rows[0]).find(k => /^mean_/i.test(k));
+  if (!col) throw new Error("no mean_* column in CSV");
+  for (const row of rows) {
+    const v = parseFloat(row[col]), d = String(row.date || "");
+    if (!isFinite(v) || d.length < 7) continue;
+    const y = +d.slice(0, 4), m = +d.slice(5, 7) - 1, key = norm(nameOf(row));
+    ((series[key] ??= {})[y] ??= Array(12).fill(null))[m] = v;
+  }
+}
+async function loadData() {
+  const series = {};
+  addRows(series, parseCSV(await getText("t2m_state_monthly.csv")), r => r.state_ut);
+  const states = Object.keys(series);
+  try { addRows(series, parseCSV(await getText("t2m_india_monthly.csv")), () => "India"); } catch (e) { console.warn("India CSV not loaded:", e.message); }
+  if (!series.india) { // fallback: unweighted mean of the states
+    const ind = {};
+    states.forEach(k => Object.entries(series[k]).forEach(([y, arr]) => arr.forEach((v, m) => {
+      if (v == null) return; const a = (ind[y] ??= Array.from({ length: 12 }, () => []))[m]; a.push(v); }))); 
+    series.india = Object.fromEntries(Object.entries(ind).map(([y, a]) => [y, a.map(x => x.length ? x.reduce((s, v) => s + v) / x.length : null)]));
+  }
+  // safety: Kelvin -> degC (same guard as the training script)
+  let sum = 0, n = 0; Object.values(series).forEach(o => Object.values(o).forEach(a => a.forEach(v => { if (v != null) { sum += v; n++; } })));
+  if (n && sum / n > 150) Object.values(series).forEach(o => Object.values(o).forEach(a => a.forEach((v, i) => { if (v != null) a[i] = v - 273.15; })));
+  const years = Object.values(series).flatMap(o => Object.keys(o).map(Number));
+  const lastFull = Math.max(...Object.keys(series.india).map(Number).filter(y => series.india[y].filter(v => v != null).length >= MIN_MONTHS));
+  return { series, minYear: Math.min(...years), maxYear: Math.max(...years), lastFull };
+}
+let DATA = null;
+
+const MIN_MONTHS = 6; // a year needs at least this many months of data to be used
+const _clim = {};
+function climatology(r, S) { // long-term mean of each calendar month
+  const k = norm(r); if (_clim[k]) return _clim[k];
+  return _clim[k] = MONTHS.map((_, m) => { const v = Object.values(S).map(a => a[m]).filter(x => x != null); return v.reduce((t, x) => t + x, 0) / v.length; });
 }
 function getSeries(r, p) {
+  const S = DATA && DATA.series[norm(r)];
+  if (!S) return null;
   if (p.mode === "range") {
-    const a = Math.min(p.a, p.b), b = Math.max(p.a, p.b), pts = [];
-    for (let y = a; y <= b; y++) pts.push({ x: y, label: y, y: MONTHS.reduce((s, _, m) => s + monthTemp(r, y, m), 0) / 12 });
-    return { pts, scale: 10, unit: "per decade", span: `${a}–${b}`, xl: "Year" };
+    // Annual mean. A year with a few missing months is kept: each month is compared with its own
+    // long-term average (so a missing winter month does not bias a partial year warm or cold).
+    const a = Math.min(p.a, p.b), b = Math.max(p.a, p.b), pts = [], c = climatology(r, S);
+    const base = c.reduce((t, v) => t + v, 0) / 12;
+    for (let y = a; y <= b; y++) {
+      const m = S[y]; if (!m) continue;
+      const have = m.map((v, i) => v == null ? null : v - c[i]).filter(v => v != null);
+      if (have.length < MIN_MONTHS) continue;
+      const n = have.length, val = base + have.reduce((t, v) => t + v, 0) / n;
+      pts.push({ x: y, label: n < 12 ? `${y} (${n} of 12 months)` : y, y: val });
+    }
+    return { pts, scale: 10, unit: "per decade", span: pts.length ? `${pts[0].x}–${pts[pts.length - 1].x}` : `${a}–${b}`, xl: "Year" };
   }
   if (p.mode === "ym") {
-    const ms = p.months.length ? p.months : MONTHS.map((_, i) => i);
-    return { pts: ms.sort((a, b) => a - b).map(m => ({ x: m, label: MONTHS[m] + " " + p.year, y: monthTemp(r, p.year, m) })),
-      scale: 1, unit: "per month", span: `${p.year}${p.months.length ? " (" + ms.map(m => MONTHS[m]).join(", ") + ")" : ""}`, xl: "Month" };
+    const ms = (p.months.length ? p.months : MONTHS.map((_, i) => i)).slice().sort((a, b) => a - b);
+    const pts = ms.filter(m => S[p.year] && S[p.year][m] != null).map(m => ({ x: m, label: MONTHS[m] + " " + p.year, y: S[p.year][m] }));
+    return { pts, scale: 1, unit: "per month", span: `${p.year}${p.months.length ? " (" + ms.map(m => MONTHS[m]).join(", ") + ")" : ""}`, xl: "Month" };
   }
-  const n = new Date(p.year, p.month + 1, 0).getDate(), base = monthTemp(r, p.year, p.month), pts = [];
-  for (let d = 1; d <= n; d++) pts.push({ x: d, label: `${d} ${MONTHS[p.month]} ${p.year}`, y: base + (rnd(`${r}${p.year}${p.month}d${d}`) - .5) * 4 });
-  return { pts, scale: 1, unit: "per day", span: `${MONTHS[p.month]} ${p.year}`, xl: "Day" };
+  // one calendar month across every year
+  const pts = [];
+  for (let y = DATA.minYear; y <= DATA.maxYear; y++) if (S[y] && S[y][p.month] != null) pts.push({ x: y, label: MONTHS[p.month] + " " + y, y: S[y][p.month] });
+  return { pts, scale: 10, unit: "per decade", span: pts.length ? `${MONTHS[p.month]}, ${pts[0].x}–${pts[pts.length - 1].x}` : MONTHS[p.month], xl: "Year" };
 }
 
 /* ---------- regression ---------- */
@@ -60,6 +134,11 @@ function betacf(a, b, x) { let qab = a + b, qap = a + 1, qam = a - 1, c = 1, d =
 function lgam(x) { const c = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, .1208650973866179e-2, -.5395239384953e-5]; let y = x, t = x + 5.5; t -= (x + .5) * Math.log(t); let s = 1.000000000190015; for (const k of c) s += k / ++y; return -t + Math.log(2.5066282746310005 * s / x); }
 function betai(a, b, x) { if (x <= 0) return 0; if (x >= 1) return 1; const bt = Math.exp(lgam(a + b) - lgam(a) - lgam(b) + a * Math.log(x) + b * Math.log(1 - x));
   return x < (a + 1) / (a + b + 2) ? bt * betacf(a, b, x) / a : 1 - bt * betacf(b, a, 1 - x) / b; }
+function tcrit(df) { // two-sided 95% critical t value
+  if (df < 1) return NaN; let lo = 0, hi = 1000;
+  for (let i = 0; i < 60; i++) { const mid = (lo + hi) / 2; if (betai(df / 2, .5, df / (df + mid * mid)) > 0.05) lo = mid; else hi = mid; }
+  return (lo + hi) / 2;
+}
 function regress(pts) {
   const n = pts.length, x0 = pts[0].x, xs = pts.map(p => p.x - x0), ys = pts.map(p => p.y);
   const mx = xs.reduce((a, b) => a + b) / n, my = ys.reduce((a, b) => a + b) / n;
@@ -67,32 +146,55 @@ function regress(pts) {
   const b = n > 1 && sxx ? sxy / sxx : 0, a = my - b * mx;
   let sse = 0; xs.forEach((x, i) => sse += (ys[i] - a - b * x) ** 2);
   const df = n - 2, se = df > 0 && sxx ? Math.sqrt(sse / df / sxx) : 0, t = se ? b / se : 0;
-  return { b, a, x0, p: df > 0 && se ? betai(df / 2, .5, df / (df + t * t)) : 1, change: b * (xs[n - 1] - xs[0]) };
+  let syy = 0; ys.forEach(y => syy += (y - my) ** 2);
+  return { b, a, x0, se, df, r2: syy ? 1 - sse / syy : 0, ci: df > 0 ? tcrit(df) * se : NaN,
+    p: df > 0 && se ? betai(df / 2, .5, df / (df + t * t)) : 1, change: b * (xs[n - 1] - xs[0]) };
 }
 
 /* ---------- rendering ---------- */
-const ARTICLES = [
-  ["Why India's heat waves are arriving earlier", "Sample article · Climate desk"],
-  ["Reading a temperature trend: slope, p-value and what they mean", "Sample article · Explainer"],
-  ["Urban heat islands and regional warming", "Sample article · Research brief"]];
 const region = () => (typeof selected !== "undefined" && selected) ? selected : "India";
 const fmt = (v, d = 2) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(d);
 let selector, last;
 
 function refresh() {
+  if (!DATA || !selector) return;
   const r = region(), p = selector.get(), s = getSeries(r, p);
-  if (s.pts.length < 3) { $("#gist").textContent = "Pick at least three data points to compute a trend."; return; }
-  const st = regress(s.pts), sig = st.p < 0.05;
   $("#region").textContent = r;
+  if (!s || s.pts.length < 3) {
+    last = null; $("#chart").innerHTML = "";
+    $("#change").className = "big"; $("#change").textContent = "–";
+    ["pv","sl","ic","r2","se","ci","np","mean","sd","hi","lo","fit"].forEach(i => $("#" + i).textContent = "–");
+    $("#csub").textContent = r;
+    $("#gist").textContent = !s
+      ? `No temperature data found for ${r}.`
+      : "Not enough temperature data for this selection (at least three points are needed). Years with fewer than 6 months of data are skipped in the annual view.";
+    return;
+  }
+  const st = regress(s.pts), sig = st.p < 0.05;
   $("#change").className = "big " + (st.change > 0 ? "up" : "");
   $("#change").innerHTML = `${fmt(st.change)}<small>°C over ${s.span}</small>`;
   $("#pv").textContent = st.p < 0.001 ? "< 0.001" : st.p.toFixed(3);
   $("#sl").textContent = fmt(st.b * s.scale, 3) + " °C";
   $("#slu").textContent = "Slope " + s.unit;
   $("#ic").textContent = st.a.toFixed(1) + " °C";
+  const ys = s.pts.map(p => p.y), n = ys.length, mean = ys.reduce((t, v) => t + v, 0) / n,
+    sd = Math.sqrt(ys.reduce((t, v) => t + (v - mean) ** 2, 0) / (n - 1)),
+    hiP = s.pts.reduce((a, b) => b.y > a.y ? b : a), loP = s.pts.reduce((a, b) => b.y < a.y ? b : a),
+    fitAt = x => st.a + st.b * (x - st.x0), xa = s.pts[0].x, xb = s.pts[n - 1].x;
+  $("#r2").textContent = st.r2.toFixed(3);
+  $("#se").textContent = "± " + (st.se * s.scale).toFixed(3) + " °C";
+  $("#seu").textContent = "Std. error " + s.unit;
+  $("#ci").textContent = isFinite(st.ci) ? `${fmt((st.b - st.ci) * s.scale, 2)} to ${fmt((st.b + st.ci) * s.scale, 2)} °C` : "–";
+  $("#np").textContent = n;
+  $("#mean").textContent = mean.toFixed(2) + " °C";
+  $("#sd").textContent = sd.toFixed(2) + " °C";
+  $("#hi").textContent = hiP.y.toFixed(2) + " °C";
+  $("#hil").textContent = "Highest · " + hiP.label;
+  $("#lo").textContent = loP.y.toFixed(2) + " °C";
+  $("#lol").textContent = "Lowest · " + loP.label;
+  $("#fit").textContent = `${fitAt(xa).toFixed(1)} → ${fitAt(xb).toFixed(1)} °C`;
   $("#gist").textContent = `${r} ${st.change >= 0 ? "warmed" : "cooled"} by about ${Math.abs(st.change).toFixed(2)} °C across ${s.span}, a rate of ${fmt(st.b * s.scale, 3)} °C ${s.unit}. ` +
     (sig ? "The trend is statistically significant (p < 0.05), so it is unlikely to be random variation." : "The trend is not statistically significant (p ≥ 0.05), so this change could be natural variability.");
-  $("#arts").innerHTML = ARTICLES.map(a => `<li><a href="#">${a[0]}</a><small>${a[1]}</small></li>`).join("");
   $("#ctitle").textContent = "Temperature trend";
   $("#csub").textContent = `${r} · ${s.span}`;
   last = { s, st }; draw();
@@ -125,12 +227,19 @@ function draw() {
 }
 
 /* ---------- wire up ---------- */
-selector = createTimePeriodSelector($("#tps"), { startYear: 1980, endYear: 2025, onChange: refresh });
-// refresh whenever the map selection changes
+// refresh whenever the map selection changes (refresh() waits until the data has loaded)
 const _sel = window.selectState, _reset = window.resetView;
 window.selectState = function (n) { _sel(n); refresh(); };
-window.resetView = function () { _reset(); if (selector) refresh(); };
+window.resetView = function () { _reset(); refresh(); };
 // keep the map and chart sized to their boxes
 new ResizeObserver(() => { map.invalidateSize(); draw(); }).observe($(".mapcard"));
 window.addEventListener("resize", draw);
-refresh();
+
+loadData().then(d => {
+  DATA = d;
+  selector = createTimePeriodSelector($("#tps"), { startYear: d.minYear, endYear: d.maxYear, defaultEnd: d.lastFull, onChange: refresh });
+  refresh();
+}).catch(e => {
+  $("#gist").textContent = "Could not load temperature data (" + e.message + "). Serve the project root with: python3 -m http.server 8080";
+  console.error(e);
+});

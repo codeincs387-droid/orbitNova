@@ -29,3 +29,6 @@ data/processed/monthly_grid/
 _t2m_transfer/
 T2M_Member2_Complete.zip
 test1/
+
+#swap files
+*.orig
